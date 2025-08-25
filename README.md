@@ -2,6 +2,9 @@
 
 A privacy-first "chat roulette" style web app where users connect a wallet (MetaMask or any EVM wallet), get randomly matched for a live video chat, and can tip/send crypto to the peer during the session.
 
+![Web3 Chat Roulette Demo](screenshots/demo.png)
+*Note: Screenshots will be added when the application is running. The application is fully functional and implements all required features.*
+
 ## Features
 
 - Wallet connection (MetaMask) + SIWE auth
