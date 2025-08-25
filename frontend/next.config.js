@@ -210,8 +210,8 @@ const nextConfig = {
   // Strict mode
   reactStrictMode: true,
 
-  // Standalone output for Docker
-  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  // Vercel deployment optimization (remove standalone for Vercel)
+  output: process.env.VERCEL ? undefined : (process.env.NODE_ENV === 'production' ? 'standalone' : undefined),
 
   // Compiler options
   compiler: {
