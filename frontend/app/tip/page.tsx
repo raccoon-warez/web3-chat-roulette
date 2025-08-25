@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAccount, useBalance, useSendTransaction, usePrepareSendTransaction } from 'wagmi'
+import { useAccount, useBalance, useSendTransaction } from 'wagmi'
 import { parseEther } from 'viem'
 import { useRouter } from 'next/navigation'
 
@@ -22,22 +22,17 @@ export default function Tip() {
     address: address,
   })
   
-  // Prepare transaction
-  const { config } = usePrepareSendTransaction({
-    to: recipientAddress as `0x${string}`,
-    value: tipAmount ? parseEther(tipAmount) : undefined,
-  })
-  
   // Send transaction
   const { sendTransaction } = useSendTransaction({
-    ...config,
-    onSuccess: (data) => {
-      setTxStatus(`Success! Transaction hash: ${data.hash}`)
-      setIsSending(false)
-    },
-    onError: (error) => {
-      setTxStatus(`Error: ${error.message}`)
-      setIsSending(false)
+    mutation: {
+      onSuccess: (data) => {
+        setTxStatus(`Success! Transaction hash: ${data}`)
+        setIsSending(false)
+      },
+      onError: (error) => {
+        setTxStatus(`Error: ${error.message}`)
+        setIsSending(false)
+      }
     }
   })
   
@@ -65,9 +60,12 @@ export default function Tip() {
     try {
       setIsSending(true)
       setTxStatus('Sending transaction...')
-      sendTransaction?.()
+      sendTransaction({
+        to: recipientAddress as `0x${string}`,
+        value: parseEther(tipAmount),
+      })
     } catch (error) {
-      setTxStatus(`Error: ${error.message}`)
+      setTxStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setIsSending(false)
     }
   }

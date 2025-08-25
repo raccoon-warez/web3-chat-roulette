@@ -85,7 +85,7 @@ export default function Moderation() {
       setTargetAddress('')
       setSessionId('')
     } catch (error) {
-      setReportStatus(`Error: ${error.message}`)
+      setReportStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsSubmitting(false)
     }
@@ -119,7 +119,7 @@ export default function Moderation() {
       // Refresh blocklist
       fetchBlocklist()
     } catch (error) {
-      setBlockStatus(`Error: ${error.message}`)
+      setBlockStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsBlocking(false)
     }

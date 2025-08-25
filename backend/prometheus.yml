@@ -1,0 +1,230 @@
+# Prometheus configuration for Web3 Chat Roulette monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+  
+  external_labels:
+    cluster: 'web3-chat-roulette'
+    environment: 'production'
+
+# Rule files
+rule_files:
+  - "alert_rules.yml"
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # Web3 Chat Roulette application instances
+  - job_name: 'web3-chat-app'
+    static_configs:
+      - targets: 
+          - 'web3-app-1:3001'
+          - 'web3-app-2:3002'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    
+    # Relabeling for better metric organization
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:3001  # Prometheus server address
+    
+    # Custom headers for authentication if needed
+    # bearer_token: "your-token-here"
+    
+    # Health check endpoint
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '^go_.*'
+        action: drop  # Drop Go runtime metrics to reduce noise
+
+  # Management endpoints for cluster monitoring
+  - job_name: 'web3-management'
+    static_configs:
+      - targets:
+          - 'web3-app-1:9001'
+          - 'web3-app-2:9002'
+    metrics_path: /metrics
+    scrape_interval: 30s
+    
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: management_instance
+
+  # HAProxy load balancer metrics
+  - job_name: 'haproxy'
+    static_configs:
+      - targets: ['load-balancer:8080']
+    metrics_path: /stats
+    params:
+      stats: ['']
+    scrape_interval: 30s
+    
+    # HAProxy stats CSV format conversion
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'haproxy_.*'
+        target_label: __tmp_haproxy
+        replacement: '1'
+
+  # Redis Cluster monitoring
+  - job_name: 'redis-cluster'
+    static_configs:
+      - targets:
+          - 'redis-cluster-1:7000'
+          - 'redis-cluster-2:7001'
+          - 'redis-cluster-3:7002'
+          - 'redis-cluster-4:7003'
+          - 'redis-cluster-5:7004'
+          - 'redis-cluster-6:7005'
+    metrics_path: /metrics
+    scrape_interval: 30s
+    
+    # Redis-specific relabeling
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: redis_instance
+      - source_labels: [__address__]
+        regex: '.*:(\d+)'
+        target_label: redis_port
+        replacement: '${1}'
+
+  # PostgreSQL database monitoring (if postgres_exporter is installed)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: /metrics
+    scrape_interval: 30s
+    
+    # Database connection parameters
+    params:
+      collect[]: ['stat_database', 'stat_bgwriter', 'stat_activity']
+
+  # Node exporter for system metrics (if deployed)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+          - 'web3-app-1:9100'
+          - 'web3-app-2:9100'
+    metrics_path: /metrics
+    scrape_interval: 15s
+    
+    # System metrics relabeling
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: node_instance
+
+  # cAdvisor for container metrics (if deployed)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    metrics_path: /metrics
+    scrape_interval: 30s
+    
+    # Container metrics filtering
+    metric_relabel_configs:
+      - source_labels: [container_label_com_docker_compose_service]
+        target_label: service_name
+      - source_labels: [__name__]
+        regex: 'container_.*'
+        target_label: metric_type
+        replacement: 'container'
+
+  # Elasticsearch monitoring (if available)
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch:9200']
+    metrics_path: /_prometheus/metrics
+    scrape_interval: 30s
+
+  # Custom application health endpoints
+  - job_name: 'web3-health-detailed'
+    static_configs:
+      - targets:
+          - 'web3-app-1:3001'
+          - 'web3-app-2:3002'
+    metrics_path: /health/performance
+    scrape_interval: 60s
+    scrape_timeout: 30s
+    
+    # Authentication for detailed health metrics
+    # bearer_token: "health-metrics-token"
+
+  # WebSocket connection monitoring
+  - job_name: 'websocket-metrics'
+    static_configs:
+      - targets:
+          - 'web3-app-1:3001'
+          - 'web3-app-2:3002'
+    metrics_path: /api/webrtc/stats
+    scrape_interval: 30s
+    
+    # WebSocket-specific metric processing
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '.*websocket.*'
+        target_label: connection_type
+        replacement: 'websocket'
+
+  # Scaling metrics from auto-scaler
+  - job_name: 'scaling-metrics'
+    static_configs:
+      - targets:
+          - 'web3-app-1:9001'  # Management port
+    metrics_path: /scaling/status
+    scrape_interval: 60s
+    
+    # Scaling-specific labels
+    relabel_configs:
+      - target_label: metrics_type
+        replacement: 'scaling'
+
+# Recording rules for aggregated metrics
+# These create new metrics based on existing ones
+rule_files:
+  - "recording_rules.yml"
+
+# Storage configuration
+storage:
+  tsdb:
+    path: /prometheus
+    retention.time: 7d
+    retention.size: 10GB
+    
+# Remote write configuration (for long-term storage)
+# remote_write:
+#   - url: "https://your-remote-storage/api/v1/write"
+#     basic_auth:
+#       username: "your-username"
+#       password: "your-password"
+
+# Federation configuration (if using multiple Prometheus instances)
+# scrape_configs:
+#   - job_name: 'federate'
+#     scrape_interval: 15s
+#     honor_labels: true
+#     metrics_path: '/federate'
+#     params:
+#       'match[]':
+#         - '{job=~"prometheus|node|web3-.*"}'
+#     static_configs:
+#       - targets:
+#         - 'prometheus-primary:9090'

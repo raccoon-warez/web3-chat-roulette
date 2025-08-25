@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAccount, useSwitchChain } from 'wagmi'
+import { useAccount, useSwitchChain, useChains } from 'wagmi'
 import { useRouter } from 'next/navigation'
 import SafetyInterstitial from '@/components/SafetyInterstitial'
 
 export default function Lobby() {
   const [mounted, setMounted] = useState(false)
   const { isConnected, chain } = useAccount()
-  const { chains, switchChain } = useSwitchChain()
+  const { switchChain } = useSwitchChain()
+  const chains = useChains()
   const router = useRouter()
   const [showSafetyInterstitial, setShowSafetyInterstitial] = useState(false)
 

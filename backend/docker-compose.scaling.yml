@@ -1,0 +1,377 @@
+# Docker Compose configuration for scaling architecture
+version: '3.8'
+
+services:
+  # Redis Cluster Setup
+  redis-cluster-1:
+    image: redis:7-alpine
+    container_name: redis-cluster-1
+    command: redis-server --port 7000 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+    ports:
+      - "7000:7000"
+    volumes:
+      - redis-cluster-1-data:/data
+    networks:
+      - web3-network
+
+  redis-cluster-2:
+    image: redis:7-alpine
+    container_name: redis-cluster-2
+    command: redis-server --port 7001 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+    ports:
+      - "7001:7001"
+    volumes:
+      - redis-cluster-2-data:/data
+    networks:
+      - web3-network
+
+  redis-cluster-3:
+    image: redis:7-alpine
+    container_name: redis-cluster-3
+    command: redis-server --port 7002 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+    ports:
+      - "7002:7002"
+    volumes:
+      - redis-cluster-3-data:/data
+    networks:
+      - web3-network
+
+  redis-cluster-4:
+    image: redis:7-alpine
+    container_name: redis-cluster-4
+    command: redis-server --port 7003 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+    ports:
+      - "7003:7003"
+    volumes:
+      - redis-cluster-4-data:/data
+    networks:
+      - web3-network
+
+  redis-cluster-5:
+    image: redis:7-alpine
+    container_name: redis-cluster-5
+    command: redis-server --port 7004 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+    ports:
+      - "7004:7004"
+    volumes:
+      - redis-cluster-5-data:/data
+    networks:
+      - web3-network
+
+  redis-cluster-6:
+    image: redis:7-alpine
+    container_name: redis-cluster-6
+    command: redis-server --port 7005 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+    ports:
+      - "7005:7005"
+    volumes:
+      - redis-cluster-6-data:/data
+    networks:
+      - web3-network
+
+  # Redis Cluster Initialization
+  redis-cluster-init:
+    image: redis:7-alpine
+    container_name: redis-cluster-init
+    command: >
+      sh -c "sleep 10 && 
+             echo 'yes' | redis-cli --cluster create
+             redis-cluster-1:7000
+             redis-cluster-2:7001
+             redis-cluster-3:7002
+             redis-cluster-4:7003
+             redis-cluster-5:7004
+             redis-cluster-6:7005
+             --cluster-replicas 1"
+    depends_on:
+      - redis-cluster-1
+      - redis-cluster-2
+      - redis-cluster-3
+      - redis-cluster-4
+      - redis-cluster-5
+      - redis-cluster-6
+    networks:
+      - web3-network
+
+  # PostgreSQL with optimizations
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres-main
+    environment:
+      POSTGRES_DB: web3_chat
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # Performance optimizations
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - web3-network
+
+  # Application instances with scaling
+  web3-app-1:
+    build: .
+    container_name: web3-app-1
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      MANAGEMENT_PORT: 9001
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: web3_chat
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      # Redis Cluster
+      REDIS_CLUSTER_ENABLED: true
+      REDIS_CLUSTER_NODES: redis-cluster-1:7000,redis-cluster-2:7001,redis-cluster-3:7002
+      # Scaling configuration
+      CLUSTER_ENABLED: true
+      CLUSTER_WORKERS: 2
+      LOAD_BALANCER_ENABLED: true
+      AUTO_SCALING_ENABLED: true
+      MIN_INSTANCES: 1
+      MAX_INSTANCES: 4
+      # Monitoring
+      MONITORING_ENABLED: true
+      HEALTH_CHECKS_ENABLED: true
+      METRICS_ENABLED: true
+    ports:
+      - "3001:3001"
+      - "9001:9001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-cluster-init:
+        condition: service_completed_successfully
+    volumes:
+      - app-logs-1:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - web3-network
+
+  web3-app-2:
+    build: .
+    container_name: web3-app-2
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      HOST: 0.0.0.0
+      MANAGEMENT_PORT: 9002
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: web3_chat
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      # Redis Cluster
+      REDIS_CLUSTER_ENABLED: true
+      REDIS_CLUSTER_NODES: redis-cluster-1:7000,redis-cluster-2:7001,redis-cluster-3:7002
+      # Scaling configuration
+      CLUSTER_ENABLED: true
+      CLUSTER_WORKERS: 2
+      LOAD_BALANCER_ENABLED: true
+      AUTO_SCALING_ENABLED: false # Only primary handles auto-scaling
+      # Monitoring
+      MONITORING_ENABLED: true
+      HEALTH_CHECKS_ENABLED: true
+      METRICS_ENABLED: true
+    ports:
+      - "3002:3002"
+      - "9002:9002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-cluster-init:
+        condition: service_completed_successfully
+    volumes:
+      - app-logs-2:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - web3-network
+
+  # Load Balancer (HAProxy)
+  load-balancer:
+    image: haproxy:2.8-alpine
+    container_name: load-balancer
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # HAProxy stats
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./ssl:/etc/ssl/certs:ro
+    depends_on:
+      - web3-app-1
+      - web3-app-2
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    networks:
+      - web3-network
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=7d'
+    networks:
+      - web3-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - web3-network
+
+  # Log aggregation
+  elasticsearch:
+    image: elasticsearch:8.8.0
+    container_name: elasticsearch
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      xpack.security.enabled: false
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - web3-network
+
+  kibana:
+    image: kibana:8.8.0
+    container_name: kibana
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - web3-network
+
+  # Log shipper
+  filebeat:
+    image: elastic/filebeat:8.8.0
+    container_name: filebeat
+    user: root
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - app-logs-1:/logs/app-1:ro
+      - app-logs-2:/logs/app-2:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - elasticsearch
+    networks:
+      - web3-network
+
+networks:
+  web3-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  # Redis Cluster volumes
+  redis-cluster-1-data:
+  redis-cluster-2-data:
+  redis-cluster-3-data:
+  redis-cluster-4-data:
+  redis-cluster-5-data:
+  redis-cluster-6-data:
+  
+  # Database volume
+  postgres-data:
+  
+  # Application logs
+  app-logs-1:
+  app-logs-2:
+  
+  # Monitoring volumes
+  prometheus-data:
+  grafana-data:
+  elasticsearch-data:

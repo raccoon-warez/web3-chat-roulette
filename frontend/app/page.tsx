@@ -1,22 +1,30 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { InjectedConnector } from 'wagmi/connectors/injected'
+import { useAccount, useConnect, useDisconnect, useConnectors, useReconnect } from 'wagmi'
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
-  const { isConnected, address } = useAccount()
-  const { connect } = useConnect({
-    connector: new InjectedConnector(),
-  })
+  const { isConnected, address, isReconnecting } = useAccount()
+  const { connect, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
+  const { reconnect } = useReconnect()
+  const connectors = useConnectors()
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   if (!mounted) return null
+
+  if (isReconnecting) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen py-2">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <p className="mt-4 text-gray-600">Reconnecting to wallet...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-2">
@@ -47,12 +55,26 @@ export default function Home() {
               </button>
             </div>
           ) : (
-            <button
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-              onClick={() => connect()}
-            >
-              Connect Wallet
-            </button>
+            <div className="space-y-2">
+              {connectors.map((connector) => (
+                <button
+                  key={connector.uid}
+                  className={`bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded block w-full ${
+                    isConnecting || !connector.ready ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  onClick={() => connect({ connector })}
+                  disabled={isConnecting || !connector.ready}
+                >
+                  {isConnecting ? 'Connecting...' : `Connect ${connector.name}`}
+                </button>
+              ))}
+              <button
+                className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded block w-full mt-2"
+                onClick={() => reconnect()}
+              >
+                Reconnect
+              </button>
+            </div>
           )}
         </div>
       </main>

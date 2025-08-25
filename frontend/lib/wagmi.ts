@@ -1,34 +1,30 @@
-import { createConfig, configureChains, mainnet } from 'wagmi'
-import { publicProvider } from 'wagmi/providers/public'
-import { InjectedConnector } from 'wagmi/connectors/injected'
-import { MetaMaskConnector } from 'wagmi/connectors/metaMask'
+import { http, createConfig } from 'wagmi'
+import { mainnet, polygon, base } from 'wagmi/chains'
+import { injected, metaMask, walletConnect } from 'wagmi/connectors'
 
-// Configure chains & providers
-const { chains, publicClient, webSocketPublicClient } = configureChains(
-  [
-    mainnet,
-    // Add other chains as needed
-    // polygon,
-    // base,
-  ],
-  [
-    publicProvider(),
-  ],
-)
-
-// Set up wagmi config
+// Set up wagmi config with v2 format
 export const config = createConfig({
-  autoConnect: true,
+  chains: [mainnet, polygon, base],
   connectors: [
-    new MetaMaskConnector({ chains }),
-    new InjectedConnector({
-      chains,
-      options: {
-        name: (detectedName) =>
-          `Injected (${typeof detectedName === 'string' ? detectedName : detectedName.join(', ')})`,
-      },
+    metaMask(),
+    injected(),
+    walletConnect({
+      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'your-project-id',
     }),
   ],
-  publicClient,
-  webSocketPublicClient,
+  transports: {
+    [mainnet.id]: http(undefined, {
+      retryCount: 3,
+      retryDelay: 1000,
+    }),
+    [polygon.id]: http(undefined, {
+      retryCount: 3,
+      retryDelay: 1000,
+    }),
+    [base.id]: http(undefined, {
+      retryCount: 3,
+      retryDelay: 1000,
+    }),
+  },
+  ssr: true,
 })
