@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Suspense } from 'react'
 import { Providers } from './providers'
-import { PerformanceMonitor } from '@/lib/performance-monitor'
+// import { PerformanceMonitor } from '@/lib/performance-monitor'
 import { preloadResources } from '@/lib/lazy-loading'
 
 // Optimize font loading
@@ -178,7 +178,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-white dark:bg-black">
         {/* Performance monitoring wrapper */}
-        <PerformanceMonitor>
+        {/* <PerformanceMonitor> */}
           <Suspense fallback={<LoadingFallback />}>
             <Providers>
               {/* Main app content */}
@@ -197,7 +197,7 @@ export default function RootLayout({
               </a>
             </Providers>
           </Suspense>
-        </PerformanceMonitor>
+        {/* </PerformanceMonitor> */}
         
         {/* Service worker registration */}
         <script

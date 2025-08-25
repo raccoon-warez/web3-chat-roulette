@@ -127,7 +127,7 @@ export const preloadImage = (src: string, priority: boolean = true) => {
     link.as = 'image'
     link.href = src
     if (priority) {
-      link.fetchPriority = 'high'
+      (link as any).fetchPriority = 'high'
     }
     document.head.appendChild(link)
   }
